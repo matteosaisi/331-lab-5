@@ -1,9 +1,14 @@
 ---
 title: "Lab 5: Murder in SQL City"
-author: "Your name here!"
+author: "Matteo Saisi"
 format: html
 editor: source
 embed-resources: true
+warning: false
+message: false
+echo: true
+code-tools: true
+code-fold: true
 ---
 
 For this lab, you will be joining and filtering related datasets to solve a murder mystery!
@@ -57,13 +62,85 @@ Detective Wickham reaches out to you...
 ```{r}
 #| label: inspecting-crime-scene-report
 
+crime_scene_report |>
+  filter(city == "SQL City",
+         type == "murder",
+         ymd(date) == "2018-01-15") |>
+  pull(description)
+
 ```
 
+The crime scene report from the murder on January 15, 2018 gave leads on two witnesses.
 
 **Follow the evidence to the person responsible for the murder, building a report as you go.**
 Hint: Make sure you check for interviews with any suspects!
 
+```{r}
+#| label: finding witnesses and their interview transcripts
+
+person_interview <- person |>
+  inner_join(interview, join_by(id == person_id))
+
+person_interview |>
+  filter(address_street_name == "Northwestern Dr", address_number == max(address_number)) |>
+  pull(transcript)
+
+person_interview |>
+  filter(address_street_name == "Franklin Ave", str_detect(name, pattern = "Annabel")) |>
+  pull(transcript)
+
+
+```
+
+Using the clues from the crime scene report, I was able to find the two witnesses and get the clues from their interviews. 
+
+```{r}
+#| label: checking gym members and license plates and then searching for transcripts
+
+get_fit_now_member |>
+  left_join(get_fit_now_check_in,
+            join_by(id == membership_id)) |>
+  filter(membership_status == "gold",
+         str_starts(id, "48Z"),
+         ymd(check_in_date) == "2018-01-09") |>
+  pull(person_id)
+
+person |>
+  right_join(drivers_license,
+            join_by(license_id == id)) |>
+  filter(str_detect(plate_number, "H42W")) |>
+  pull(id)
+
+person_interview |>
+  filter(id == 51739 | 
+           id == 67318 | 
+           id == 78193 | 
+           id == 28819) |>
+  pull(transcript)
+
+```
+
+Using the clues from the witnesses, I was able to narrow it down to four suspects. After searching the interviews for all four, only one showed up. I used this suspect's interview statement to look for the final suspect. 
+
+```{r}
+#| label: using the information from the previous transcript to find the final suspect
+
+person |>
+  full_join(drivers_license,
+            join_by(license_id == id)) |>
+  full_join(facebook_event_checkin,
+            join_by(id == person_id)) |>
+  full_join(income,
+            join_by(ssn)) |>
+  filter(height == c(65:67),
+         hair_color == "red",
+         car_make == "Tesla",
+         str_detect(event_name, "SQL Symphony")) |>
+  pull(name)
+
+```
+After filtering for the information in the previous suspect's interview, I believe I have narrowed it down to one final suspect.
 
 ## And the final suspect is...
 
-*Put the name of the person responsible for the murder here:*
+Miranda Priestly
